@@ -1,0 +1,141 @@
+---
+title: "Tamaño de Muestra (Backgound)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Tamaño de Muestra (Backgound)}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Objetivo 
+
+Determinar el tamaño de muestra para los puntos BacKground 
+
+
+## Material y Métodos 
+
+Se corrió el algoritmo LightGBM con la base del 2023 al 2025 con diferentes tamaños de muestra para extraer los puntos background del área de interés. Los tamaños de muestra oscilaron desde 0.02K hasta 200K (0.02K, 0.05K, 0.10K, 0.50K, 1K, 5K, 10K,15K,20K, 25K, 30K, 35K, 40K, 45K, 50K, 55K, 60K,65K, 70K, 75K, 80K, 85K, 90K, 95K, 100K,150K,200K). El o los tamaños de muestra ideales para la base, fue seleccionado considerando la menor diferencia de la sensibilidad y la correlación tetracórica entre el train y el test.
+
+
+
+## Resultados
+ 
+Los resultados de la sensibilidad y la correlación tetracórica entre el train y el test con diferentes tamaños de muestra son proporcionados en la siguientes dos gráficas (Figura 1 y 2). Los valores de las metricas sobre o cercanas la línea transversal indican los tamaños de muestra con menor diferencia entre el train y el test.
+
+```{r sensibilidad, fig.cap= "Figura 1. Sensibilidad en el train y test con diferentes tamaños de muestra."}
+#| warning: False
+#| message: False
+#| echo: true
+#| output: true
+#| out.width: "100%"
+#| dpi: 600
+load("~/Library/CloudStorage/Dropbox/projects/machine_learning/5.output/lgbm_models/metrics_lgbm.RData")
+
+
+metrics_lgbm |>
+    dplyr::distinct() |>
+    dplyr::mutate(n = stringr::str_replace_all(n,
+                                               "k|K",
+                                               "")) |>
+    dplyr::mutate(n = as.numeric(n)) |>
+    dplyr::filter(.metric %in% c("sens")) |>
+    ggplot2::ggplot(ggplot2::aes(y = .train,
+                                 x = .test,
+                                 label = n,
+                                 size = difference,
+                                 fill = n)) +
+    ggplot2::geom_point(shape = 21,
+                        color = "black")+
+    ggplot2::geom_text(size = 3,
+                       vjust = -1) +
+    ggplot2::geom_abline(intercept = 0, 
+                         slope = 1, 
+                         color="blue", 
+                         linetype= 1, 
+                         alpha = 0.5,
+                         linewidth=1.5) +
+    ggplot2::coord_cartesian(xlim = c(0.9, 0.97),
+                             ylim = c(0.9, 0.99)) +
+    ggplot2::scale_x_continuous(breaks = seq(from = 0.9, 
+                                             to = 0.97, 
+                                             by = 0.01)) +
+    ggplot2::scale_y_continuous(breaks = seq(from = 0.9, 
+                                             to = 0.99,
+                                             by = 0.01)) +
+    ggplot2::scale_fill_viridis_c("Sample Size (K)") +
+    ggplot2::ylab("Sansibilidad (Train)") +
+    ggplot2::xlab("Sensibilidad (Test)")
+
+```
+
+
+
+```{r corr, fig.cap="Figura 2. Correlación tetracórica en el train y test con diferentes tamaños de muestra."}
+#| warning: False
+#| message: False
+#| echo: true
+#| output: true
+#| out.width: "100%"
+#| dpi: 600
+metrics_lgbm |>
+  dplyr::distinct() |>
+    dplyr::mutate(n = stringr::str_replace_all(n,
+                                               "k|K",
+                                               "")) |>
+    dplyr::mutate(n = as.numeric(n)) |>
+    dplyr::filter(.metric %in% c("sens")) |>
+    dplyr::mutate(.metric = stringr::str_replace_all(n,
+                                               "sens",
+                                               "Correlation")) |>
+    dplyr::mutate(n = as.numeric(n)) |>
+    dplyr::mutate(dif = corr_train-corr_test) |>
+    #dplyr::filter(.metric %in% c("sens", "accuracy")) |>
+    #dplyr::filter(.metric %in% c("accuracy")) |>
+    ggplot2::ggplot(ggplot2::aes(y = corr_train,
+                                 x = corr_test,
+                                 label = n,
+                                 fill = n,
+                                 #fill = dif,
+                                 size = dif)) +
+    ggplot2::geom_point(shape = 21,
+                        #fill = "blacK",
+                        color = "black") +
+    ggplot2::scale_fill_viridis_c("Sample Size (K)")+
+    ggplot2::geom_text(size = 3,
+                       vjust = -1,
+                       checK_overlap = TRUE) +
+    #ggplot2::facet_wrap(".metric",
+    #                    scales = "free",
+    #                    labeller = ggplot2::labeller(sens = "Correlation")) +
+    ggplot2::geom_abline(intercept = 0, 
+                         slope = 1, 
+                         color="blue", 
+                         linetype= 1, 
+                         alpha = 0.5,
+                         linewidth=1.5) +
+    ggplot2::coord_cartesian(xlim = c(0.80, 1),
+                             ylim = c(0.80, 1)) +
+    ggplot2::scale_x_continuous(breaks = seq(from = 0.8, 
+                                             to = 1, 
+                                             by = 0.05)) +
+    ggplot2::scale_y_continuous(breaks = seq(from = 0.8, 
+                                             to = 1,
+                                             by = 0.05)) +
+    ggplot2::ylab("Correlación Tetracorica (Train)") +
+    ggplot2::xlab("Correlación Tetracorica (Test)")
+
+
+```
+
+
+# Conclusión.
+
+El tamaño de muestra ideal para la base de acuerdo a las resultados proporcionados en la gráfica son 55K y 60K observaciones para muestrear los puntos background.

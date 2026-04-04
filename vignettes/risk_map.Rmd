@@ -1,0 +1,68 @@
+---
+title: "Mapa de riesgo del área no endémica en México"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Mapa de riesgo del área no endémica en México}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Step 1. load the pkgs
+
+```{r}
+library(terra)
+library(tidyterra)
+library(mapgl)
+```
+
+
+##Step 2. Load the risk layer
+
+```{r}
+# Step 1. load the risk layer ####
+# very high 3,
+# high 2
+# Mid. 1
+# low 4
+# veri low 5
+risk <- terra::rast("/Users/fdzul/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/risk/layers_risk_60K.tif") |>
+    dplyr::mutate(risk = dplyr::case_when(lyr1 == 1 ~ "Mid",
+                                          lyr1 == 2 ~ "High",
+                                          lyr1 == 3 ~ "Very High",
+                                          lyr1 == 4 ~ "Low",
+                                          lyr1 == 5 ~ "Very Low")) |>
+    dplyr::mutate(risk = factor(risk,
+                                levels = c("High", "Low", "Mid", "Very High", "Very Low")[c(5, 2, 3, 1, 4)])) |>
+    dplyr::select(risk)
+```
+
+
+## Step 3. map the risk
+
+```{r}
+maplibre_view(risk, 
+              palette = viridis::turbo) |>
+    add_categorical_legend(legend_title = "Risk",
+                           position = "bottom-left",
+                           values = c("Very Low", "Low",
+                                      "Mid", "High", "Very High"),
+                           interactive = TRUE,
+                           add = FALSE,
+                           draggable = TRUE,
+                           patch_shape = "circle",
+                           colors = viridis::turbo(n = 5)) |>
+    add_fullscreen_control(position = "top-left") |> 
+    add_navigation_control() |>
+    add_globe_control() |>
+    add_scale_control()
+```
+
+

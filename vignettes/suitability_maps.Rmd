@@ -1,0 +1,163 @@
+---
+title: "Model Predicted Enviromental Suitability for Dengue"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Model Predicted Enviromental Suitability for Dengue}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+## Sensitivity between LighGBM and XGBoost
+
+
+Para todos los periodos de tiempo analizados, el algoritmos de Machine Learning LightGBM presentó sensibilidades mayores y diferencias menores entre el train y test comparado con el algoritmos de Machine Learning XGBoost. 
+
+```{r sensibilidad, fig.cap= "Figura 1. Sensibilidad en el train y test con LightGBM y XGBoost"}
+#| warning: False
+#| message: False
+#| echo: true
+#| output: true
+#| out.width: "100%"
+#| dpi: 600
+# Step 1. load the datasets ####
+load("~/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/metrics/metrics.RData")
+
+
+# Step 2. visualization os sensitivity ####
+metrics |>
+    dplyr::distinct() |>
+    dplyr::filter(.metric %in% c("sens"))  |>
+    ggplot2::ggplot(ggplot2::aes(y = .train,
+                                 x = .test,
+                                 label = period,
+                                 fill = lm)) +
+    ggplot2::geom_point(shape = 21,
+                        size = 5,
+                        #fill = "black",
+                        color = "white") +
+    ggplot2::scale_fill_manual("ML",
+                               values = c("#E01A59", "#63C1A0")) +
+    ggplot2::geom_text(size = 1.5,
+                       vjust = -1) +
+    ggplot2::coord_cartesian(xlim = c(0.2, 1),
+                             ylim = c(0.2, 1)) +
+    ggplot2::scale_x_continuous(breaks = seq(from = 0.2, 
+                                             to = 1, 
+                                             by = 0.2)) +
+    ggplot2::scale_y_continuous(breaks = seq(from = 0.2, 
+                                             to = 1,
+                                             by = 0.2)) +
+    ggplot2::ylab("Sensibilidad (Train)") +
+    ggplot2::xlab("Sensiblidad  (Test)") +
+    ggplot2::geom_abline(intercept = 0, 
+                         slope = 1, 
+                         color="gray60", 
+                         linetype= 1, 
+                         alpha = 0.5,
+                         linewidth=1.5) +
+    ggplot2::theme(panel.border = ggplot2::element_rect(colour = "black",
+                                               fill = NA, 
+                                               linewidth = 1),
+                   legend.position = "inside",
+                   legend.position.inside = c(0.9, 0.15),
+                   legend.background = ggplot2::element_blank())
+```
+
+
+
+## Model Predicted Enviromental Suitability for Dengue for 2008-2009 dataset
+
+```{r hs_2008_2009, fig.cap= "Figura 2. Model Predicted Enviromental Suitability for Dengue for 2008-2009 dataset"}
+library(terra)
+library(tidyterra)
+library(sf)
+library(ggplot2)
+# Step 1. load the raster layers of the probabilities ####
+terra::rast("/Users/fdzul/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/den2008_2009_lightgbm_60K.tif") |>
+    dplyr::select(.pred_presence) |>
+mapgl::maplibre_view(palette = viridis::turbo) |>
+    mapgl::add_continuous_legend(legend_title = "Probabilidad (2008-2009)",
+                                 position = "bottom-left",
+                                 values = c(0, 0.25, 0.50, 0.75, 1),
+                                 colors = viridis::turbo(n = 10)) |>
+    mapgl::add_fullscreen_control(position = "top-left") |> 
+    mapgl::add_navigation_control() |>
+    mapgl::add_globe_control() |>
+    mapgl::add_scale_control()
+
+```
+
+
+## Model Predicted Enviromental suitability for Dengue for 2012-2013 dataset
+
+```{r hs_2012_2013, fig.cap= "Figura 3. Model Predicted Enviromental Suitability for Dengue for 2012-2013 dataset"}
+# Step 1. load the pkgs ####
+library(terra)
+library(tidyterra)
+library(sf)
+library(ggplot2)
+# Step 1. load the raster layers of the probabilities ####
+terra::rast("/Users/fdzul/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/den2012_2013_lightgbm_60K.tif") |>
+    dplyr::select(.pred_presence) |>
+mapgl::maplibre_view(palette = viridis::turbo) |>
+    mapgl::add_continuous_legend(legend_title = "Probabilidad (2012-2013)",
+                                 position = "bottom-left",
+                                 values = c(0, 0.25, 0.50, 0.75, 1),
+                                 colors = viridis::turbo(n = 10)) |>
+    mapgl::add_fullscreen_control(position = "top-left") |> 
+    mapgl::add_navigation_control() |>
+    mapgl::add_globe_control() |>
+    mapgl::add_scale_control()
+```
+
+## Model Predicted Enviromental suitability for Dengue for 2018-2020 dataset
+
+```{r hs_2018_2020, fig.cap= "Figura 4. Model Predicted Enviromental Suitability for Dengue for 2018-2020 dataset"}
+# Step 1. load the pkgs ####
+library(terra)
+library(tidyterra)
+library(sf)
+library(ggplot2)
+# Step 1. load the raster layers of the probabilities ####
+terra::rast("/Users/fdzul/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/den2018_2020_lightgbm_60K.tif") |>
+    dplyr::select(.pred_presence) |>
+mapgl::maplibre_view(palette = viridis::turbo) |>
+    mapgl::add_continuous_legend(legend_title = "Probabilidad (2018-2020)",
+                                 position = "bottom-left",
+                                 values = c(0, 0.25, 0.50, 0.75, 1),
+                                 colors = viridis::turbo(n = 10)) |>
+    mapgl::add_fullscreen_control(position = "top-left") |> 
+    mapgl::add_navigation_control() |>
+    mapgl::add_globe_control() |>
+    mapgl::add_scale_control()
+```
+
+## Model Predicted Enviromental suitability for Dengue for 2023-2025 dataset
+
+```{r hs_2023_2025, fig.cap= "Figura 5. Model Predicted Enviromental Suitability for Dengue for 2023-2025 dataset"}
+# Step 1. load the pkgs ####
+library(terra)
+library(tidyterra)
+library(sf)
+library(ggplot2)
+# Step 1. load the raster layers of the probabilities ####
+terra::rast("/Users/fdzul/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/9.output/2.results_ml/den2023_2025_lightgbm_60K.tif") |>
+    dplyr::select(.pred_presence) |>
+mapgl::maplibre_view(palette = viridis::turbo) |>
+    mapgl::add_continuous_legend(legend_title = "Probabilidad (2023-2025)",
+                                 position = "bottom-left",
+                                 values = c(0, 0.25, 0.50, 0.75, 1),
+                                 colors = viridis::turbo(n = 10)) |>
+    mapgl::add_fullscreen_control(position = "top-left") |> 
+    mapgl::add_navigation_control() |>
+    mapgl::add_globe_control() |>
+    mapgl::add_scale_control()
+```
+

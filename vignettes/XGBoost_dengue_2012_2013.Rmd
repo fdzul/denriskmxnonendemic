@@ -1,0 +1,476 @@
+---
+title: "Risk of Dengue Transmission in non-endemic area of Mexico using XGBoost (2012-2013)"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Risk of Dengue Transmission in non-endemic area of Mexico using XGBoost (2012-2013)}
+  %\VignetteEngine{quarto::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+## Objective
+
+Predicting the probability of the presence of dengue in non-endemic area of Mexico using XGBoost
+
+## Step 1. Load the pkg
+
+```{r setup}
+Sys.setenv("_R_CHECK_LIMIT_CORES_" = "false")
+library(denriskmxnonendemic)
+library(tidyverse) 
+library(magrittr) 
+library(tidymodels) # Machine Learning en R
+library(skimr) 
+library(bonsai)
+library(themis) # Upsampling - downsampling
+library(parallel)
+library(doParallel)
+library(sf)
+library(mapgl)
+library(terra)
+library(tidyterra)
+```
+
+
+## Step 2. Load the dataset and the area of interes
+
+```{r load_dataset, warning=FALSE, message=FALSE}
+# Load the dengue dataset and the area of interes ####
+
+# Step 1. extract the data #####
+load("~/Library/CloudStorage/Dropbox/projects/INSP/spatial_temporal_distribution_dengue_mx/8.RData/enm/data_models/dengue_2012_2013_layers_n60000.RData")
+data <- data2012_2013$data_lyrs
+
+# Step 2. extract the area of interes ####
+
+aoi <-  data2012_2013$aoi |>
+    dplyr::filter(area == "non-endemic")
+
+```
+
+### Step 2.1. map the dataset
+
+```{r map_dengue_cases}
+#| warning: False
+#| message: False
+#| echo: true
+#| output: true
+#| out.width: "100%"
+library(mapgl)
+maplibre(style = carto_style("positron"),
+         bounds = data) |>
+    add_circle_layer(id = "dengue",
+                     source = data,
+                     circle_color = match_expr(
+                         column = "class",
+                         values = c("presence", "pseudoabs"), # reemplaza por tus valores
+                         stops = c("#E01A59", "#0F9D58")),
+                     circle_stroke_color = "white", # color = "white"
+                     circle_stroke_width = 0.5, # lwd = 0.5
+                     circle_radius = 3) |>
+    #    Capa 2 — polígono aoi (sin leyenda)
+    add_fill_layer(id = "aoi",
+                   source = aoi,
+                   fill_color = "#ECB32D",
+                   fill_opacity = 0.5, # ajusta al gusto
+                   fill_outline_color = "black") |>
+    add_line_layer(id           = "aoi-borde",
+                   source       = aoi,      # misma fuente
+                   line_color   = "black",  # color = "black"
+                   line_width   = 2,        # lwd = 2
+                   line_opacity = 1) |>
+    add_categorical_legend(legend_title = "Dengue",
+                           position = "bottom-left",
+                           values = c("presence", "pseudoabs"), 
+                           colors = c("#E01A59", "#0F9D58")) |>
+    add_fullscreen_control(position = "top-left") |> 
+    add_navigation_control()
+```
+
+### Step 2.3. Glimpse of your data
+
+```{r glimpse,  warning=FALSE, message=FALSE}
+data |>
+    dplyr::glimpse()
+```
+
+### Step 2.3. EDA Univariate
+
+```{r skim,  warning=FALSE, message=FALSE}
+# EDA Univariado ####
+skimr::skim(data |> sf::st_drop_geometry())
+```
+
+### Step 3.4. EDA Multivariate
+
+![]()
+
+
+```{r gt_plt_summary,  warning=FALSE, message=FALSE}
+gtExtras::gt_plt_summary(data |> sf::st_drop_geometry())
+```
+
+
+### 3.5. Weights
+
+#### table
+
+```{r balanceo_table, warning=FALSE, message=FALSE }
+# Balanceo
+data |>
+    sf::st_drop_geometry() |>
+    dplyr::group_by(class) |> 
+    dplyr::count(name = 'frec') |>
+    dplyr::ungroup() |>
+    dplyr::mutate( Porc= frec/sum(frec)) |>
+    gt::gt()
+
+```
+
+#### graph
+
+```{r graph,warning=FALSE, message=FALSE}
+data |>
+    sf::st_drop_geometry() |>
+    dplyr::group_by(class) |> 
+    dplyr::count(name = 'frec') |>
+    dplyr::ungroup() |>
+    dplyr::mutate(Porc= frec/sum(frec)) |>
+    ggplot2::ggplot(ggplot2::aes(x= class, 
+                                 y= Porc)) +
+    ggplot2::geom_segment(ggplot2::aes(xend = class, 
+                                       y = 0, 
+                                       yend=Porc), 
+                          color= c("#4285F4","#E01A59"), 
+                          linewidth= 1) +
+    ggplot2::geom_point(size=5, 
+                        color= c("#4285F4","#E01A59")) +
+    ggplot2::coord_flip() +
+    ggplot2::scale_y_continuous(labels = scales::percent_format()) +
+    ggplot2::labs(title= 'Porcentaje de Registros de Ae. aegypti', 
+                  y = "Porcentaje", 
+                  x = "") +
+    ggplot2::theme_bw()
+```
+
+
+## Step 4. Modeling
+
+### Step 4.1. Step Train-Test Split
+
+#### initial split
+
+```{r train_test, warning=FALSE, message=FALSE}
+# . Train-Test Split ####
+set.seed(12345) # Semilla para aleatorios
+split <- data |>
+    rsample::initial_split(prop = 0.8, 
+                           strata = class)
+```
+
+#### Train
+
+```{r train}
+train <- rsample::training(split)
+dim(train)
+```
+
+#### Test
+
+```{r test}
+test <- rsample::testing(split)
+dim(test)
+```
+
+### Step 4.2. Preprocess
+
+#### Importance Weights
+
+```{r balanceo, warning=FALSE, message=FALSE}
+train <- train |> 
+    dplyr::mutate(## crear la variable con los pesos
+        case_wts = ifelse(class == "presence", 3, 1),
+        ## crea el vector de importancia ponderada
+        case_wts = recipes::importance_weights(case_wts))
+```
+
+```{r receta, warning=FALSE, message=FALSE}
+receta <- train |>
+  sf::st_drop_geometry() |>
+  recipes::recipe(class ~ . ) |>## Crea la receta
+  #recipes::step_indicate_na(urban, tree, ia) |>
+    ## Eliminar variables que no usaremos
+    # step_rm() |>
+  
+    ## Crear nuevas variables (insight desde el EDA)
+    #recipes::step_mutate(temperature = temperature/1000) |>
+    ## Imputar los datos 
+    # step_impute_mean()
+  recipes::step_impute_knn(recipes::all_predictors() ) |>
+    ## Estandarizacion/Normalizacion de numericas
+  recipes::step_normalize(recipes::all_numeric(), 
+                             -recipes::all_outcomes()) |>
+    ## Crear una categoría "otros" que agrupe a categorias pequeñas
+  recipes::step_other(recipes::all_nominal(), 
+                        -recipes::all_outcomes() , 
+                        threshold = 0.07, 
+                        other = "otros") |>
+    ## Crear una categoría "new" para observaciones con labels "no muestreados"
+  recipes::step_novel(recipes::all_nominal(), 
+                        -recipes::all_outcomes() , 
+                        new_level = "new") |>
+    ## Crear variables indicadoras para cada categoría
+    # recipes::step_dummy(all_nominal(), -all_outcomes() ) |># Dummy
+    ## Eliminar automáticamente variables con alta correlacion 
+    ## para evitar la multicolinealidad xi ~ xj
+  recipes::step_corr(recipes::all_numeric(),
+                       -recipes::all_outcomes(), 
+                       threshold = 0.8) |>
+  recipes::step_nzv(all_predictors())
+  
+```
+
+```{r receta_view, warning=FALSE, message=FALSE}
+receta
+
+receta |>
+    recipes::prep() |>
+    recipes::bake(new_data = NULL) |>
+    dplyr::glimpse()
+```
+
+### Step 4.3. Hyperparameter Optimization and Training
+
+#### Resampling with stratify cross validation
+
+```{r remuestreo, warning=FALSE, message=FALSE}
+set.seed(12345)
+cv <- rsample::vfold_cv(train |> sf::st_drop_geometry(), 
+                        v = 10, 
+                        repeats = 2, 
+                        strata = class)
+cv
+
+```
+
+#### Metrics
+
+```{r metricas,  warning=FALSE, message=FALSE}
+#. Métricas ####
+library(yardstick)
+library(tidysdm)
+metricas <- yardstick::metric_set(roc_auc,
+                                  yardstick::sens,
+                                  yardstick::spec,
+                                  bal_accuracy,
+                                  pr_auc, 
+                                  accuracy, 
+                                  boyce_cont, 
+                                  tss_max, 
+                                  kap)
+metricas
+```
+
+
+#### Activate Parallelization
+
+```{r activate_parallelization, warning=FALSE, message=FALSE}
+parallel::detectCores(logical=FALSE)
+
+cl <- parallel::makePSOCKcluster(8)
+doParallel::registerDoParallel(cl)
+```
+
+#### Model specification
+
+```{r esp_mod, warning=FALSE, message=FALSE}
+xgb_sp <- parsnip::boost_tree(mtry = tune::tune(), 
+                              trees = tune::tune(), 
+                              tree_depth = tune::tune(),
+                              loss_reduction = tune::tune(), 
+                              learn_rate= tune::tune()) |>
+    parsnip::set_engine("xgboost") |>
+    parsnip::set_mode("classification")
+```
+
+#### Workflow
+
+```{r worflow,  warning=FALSE, message=FALSE}
+xgb_wflow <- workflows::workflow() |> 
+    workflows::add_recipe(receta) |> 
+    workflows::add_model(xgb_sp) |> 
+    workflows::add_case_weights(case_wts) ## Aquí agregamos los pesos
+
+xgb_wflow 
+```
+
+
+```{r mesh_search, warning=FALSE, message=FALSE}
+set.seed(12345)
+xgb_grid <- xgb_sp |>
+    ## preguntamos los parametros tuneables del modelo
+    workflowsets::extract_parameter_set_dials() |>
+    ## Vamos a definir un rango para el min_n y mtry
+    recipes::update(
+        ## 18 columnas sqrt(18) = 4.47 aprox 4, min = 4-3, max = 4 +3
+        mtry = dials::mtry(range= c(2, 7)),
+        ## Cantidad de árboles en el proceso de boosting
+        trees= dials::trees(range = c(20, 1000)),
+        ## Profundidad de cada arbol
+        tree_depth= dials::tree_depth(range= c(3, 7))
+        ## Los otros hiperparam los dejamos por default
+    ) |> 
+    ## En Boosting se suelen tener mallas grandes, porque estos modelos
+    ## son muy sensibles a los hiperparametros y ademas tienen una 
+    ## gran cantidad de hiperparametros
+    #grid_latin_hypercube(size = 40)
+    dials::grid_space_filling(size = 100)
+
+xgb_grid 
+```
+
+
+```{r entrenamiento_mesh_search, warning=FALSE, message=FALSE}
+tictoc::tic()
+set.seed(12345)
+xgb_tuned <- tune::tune_grid(xgb_wflow, ## Model
+                             resamples= cv, ## Crossvalidation
+                             grid = xgb_grid, ## grid search
+                             metrics = metricas, ## Metrics
+                             control= tune::control_grid(allow_par = T, 
+                                                         save_pred = T))
+tictoc::toc()
+
+```
+
+Sensitivity
+
+```{r show_best_sens}
+tune::show_best(x = xgb_tuned, metric = 'sens', n = 10)
+```
+
+Accuracy
+
+```{r show_best_accuracy}
+tune::show_best(xgb_tuned, metric = 'accuracy', n = 10)
+```
+
+
+Specificity
+
+```{r show_best_spec}
+tune::show_best(xgb_tuned, metric = 'spec', n = 10)
+```
+
+### Step 4.4. Final Model
+
+####  Define the best combination of hyperparameters
+
+#### In this workflow, the best combination of hyperparameters was defined using sensitivity, because the goal is to predict where dengue cases are located.
+
+```{r best_combination, warning=FALSE, message=FALSE}
+xgb_pars_fin <- tune::select_best(xgb_tuned, 
+                                   metric = "sens")
+xgb_pars_fin
+```
+
+#### Finalize (give values to tunable parameters) the workflow
+
+```{r finalize_workflow, warning=FALSE, message=FALSE}
+xgb_wflow_fin <- xgb_wflow |>
+    tune::finalize_workflow(xgb_pars_fin)
+xgb_wflow_fin
+```
+
+### Step 4.5. Train the final model
+
+```{r train_final_model,warning=FALSE, message=FALSE}
+xgb_fitted <- fit(xgb_wflow_fin, train)
+xgb_fitted
+```
+
+## Step 5. Evaluate the model
+
+### Step 5.1 Metrics 
+
+
+```{r evaluate_final_model,warning=FALSE, message=FALSE}
+denriskmxnonendemic::class_metrics(ml = xgb_fitted,
+                                   train = train,
+                                   ml_title = "XGBoost 2012-2013")
+```
+
+### Step 5.2 Correlation Tetrácorica
+
+#### Train
+
+```{r cor_tetrachoric_train, warning=FALSE, message=FALSE}
+y  <- train %>%
+    predict(xgb_fitted , new_data = ., type = "prob") |>
+    dplyr::mutate(Real= train$class) |>
+    dplyr::mutate(Real = ifelse(Real == "presence", 1, 0)) |>
+    dplyr::mutate(pred_presence = ifelse(.pred_presence >= .5, 1, 0)) |>
+    dplyr::select(-.pred_pseudoabs)
+correlation::correlation(data = y,
+                         select = "Real",
+                         select2 = "pred_presence",
+                         method = "tetrachoric")
+```
+
+#### Test
+
+```{r cor_tetrachoric_test, warning=FALSE, message=FALSE}
+x  <- test %>%
+    predict(xgb_fitted , new_data = ., type = "prob") |>
+    dplyr::mutate(Real= test$class) |>
+    dplyr::mutate(Real = ifelse(Real == "presence", 1, 0)) |>
+    dplyr::mutate(pred_presence = ifelse(.pred_presence >= .5, 1, 0)) |>
+    dplyr::select(-.pred_pseudoabs)
+correlation::correlation(data = x,
+                         select = "Real",
+                         select2 = "pred_presence",
+                         method = "tetrachoric")
+```
+
+## Step 6. Post-analysis
+
+```{r vip, warning=FALSE, message=FALSE}
+xgb_fitted |>
+workflows::extract_fit_parsnip() |>
+    vip::vip(geom= "col",
+             num_features = 16,
+              aesthetics = list(color = "white",
+                                fill = "black",
+                                size = 1))
+```
+
+
+## Step 7. Prediction
+
+### Step 7.1. Load the layer
+
+### Step 7.2. Prediction
+
+
+### Step 7.3. Visualization
+
+
+### Stop Cluster
+
+```{r stop_cl}
+parallel::stopCluster(cl)
+```
+
+### Step 7.3. Session Info
+
+```{r session_info}
+sessioninfo::session_info()
+```
+
