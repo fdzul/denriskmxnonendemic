@@ -1,0 +1,16 @@
+pandoc: 3.6.3
+pkgdown: 2.2.0
+pkgdown_sha: ~
+articles:
+  LightGBM_dengue_2008_2009: LightGBM_dengue_2008_2009.html
+  LightGBM_dengue_2012_2013: LightGBM_dengue_2012_2013.html
+  LightGBM_dengue_2018_2020: LightGBM_dengue_2018_2020.html
+  LightGBM_dengue_2023_2025: LightGBM_dengue_2023_2025.html
+  risk_map: risk_map.html
+  sample_size: sample_size.html
+  suitability_maps: suitability_maps.html
+  XGBoost_dengue_2008_2009: XGBoost_dengue_2008_2009.html
+  XGBoost_dengue_2012_2013: XGBoost_dengue_2012_2013.html
+  XGBoost_dengue_2018_2020: XGBoost_dengue_2018_2020.html
+  XGBoost_dengue_2023_2025: XGBoost_dengue_2023_2025.html
+last_built: 2026-04-04T01:31Z
