@@ -52,8 +52,8 @@ class_metrics <- function(ml, train, ml_title){
                                         difference = round(train-test, 2)),
                          tibble::tibble(.metric = c("TSS"),
                                         .estimator = c("binary"),
-                                        train = sum(tss$train),
-                                        test = sum(tss$test),
+                                        train = sum(tss$train)-1,
+                                        test = sum(tss$test)-1,
                                         difference = round(train-test, 2))) |>
         #dplyr::arrange(dplyr::desc(train)) |>
         gt::gt() |>

@@ -5,7 +5,6 @@ vignette: >
   %\VignetteIndexEntry{Risk of Dengue Transmission in non-endemic area of Mexico using LightGBM (2023-2025)}
   %\VignetteEngine{quarto::rmarkdown}
   %\VignetteEncoding{UTF-8}
-  
 ---
 
 ```{r, include = FALSE}
@@ -14,7 +13,6 @@ knitr::opts_chunk$set(
   comment = "#>"
 )
 ```
-
 
 ## Objective
 
@@ -35,7 +33,6 @@ library(parallel)
 library(doParallel)
 library(sf)
 ```
-
 
 ## Step 2. Load the dataset and the area of interes
 
@@ -113,7 +110,6 @@ skimr::skim(data |> sf::st_drop_geometry())
 gtExtras::gt_plt_summary(data |> sf::st_drop_geometry())
 ```
 
-
 ### 3.5. Weights
 
 #### table
@@ -156,7 +152,6 @@ data |>
     ggplot2::theme_bw()
 ```
 
-
 ## Step 4. Modeling
 
 ### Step 4.1. Step Train-Test Split
@@ -188,7 +183,6 @@ dim(test)
 ### Step 4.2. Preprocess
 
 #### Importance Weights
-
 
 ```{r preprocess_recipe, warning=FALSE, message=FALSE}
 receta <- train |>
@@ -234,7 +228,6 @@ receta <- train |>
                           seed = 345)
 ```
 
-
 ```{r recipe_view, warning=FALSE, message=FALSE}
 receta
 
@@ -276,7 +269,6 @@ metricas <- yardstick::metric_set(roc_auc,
 metricas
 ```
 
-
 #### Activate Parallelization
 
 ```{r activate_parallelization, warning=FALSE, message=FALSE}
@@ -310,7 +302,7 @@ lgbm_wflow
 
 #### Hyperparameter Space
 
- Search Mesh
+Search Mesh
 
 ```{r mesh_search, warning=FALSE, message=FALSE}
 set.seed(12345)
@@ -337,7 +329,7 @@ lgbm_grid <- lgbm_sp |>
 lgbm_grid 
 ```
 
-#### Training 
+#### Training
 
 ```{r entrenamiento_mesh_search, warning=FALSE, message=FALSE}
 tictoc::tic()
@@ -364,7 +356,6 @@ Accuracy
 tune::show_best(lgbm_tuned, metric = 'accuracy', n = 10)
 ```
 
-
 Specificity
 
 ```{r show_best_spec}
@@ -373,7 +364,7 @@ tune::show_best(lgbm_tuned, metric = 'spec', n = 10)
 
 ### Step 4.4. Final Model
 
-####  Define the best combination of hyperparameters
+#### Define the best combination of hyperparameters
 
 #### In this workflow, the best combination of hyperparameters was defined using sensitivity, because the goal is to predict where dengue cases are located.
 
@@ -400,7 +391,7 @@ lgbm_fitted
 
 ## Step 5. Evaluate the model
 
-### Step 5.1 Metrics 
+### Step 5.1 Metrics
 
 ```{r evaluate_final_model,warning=FALSE, message=FALSE}
 denriskmxnonendemic::class_metrics(ml = lgbm_fitted,
@@ -452,17 +443,13 @@ workflows::extract_fit_parsnip() |>
                                 size = 1))
 ```
 
-
 ## Step 7. Prediction
 
 ### Step 7.1. Load the layer
 
-
 ### Step 7.2. Prediction
 
-
 ### Step 7.3. Visualization
-
 
 ### Stop Cluster
 
@@ -475,5 +462,3 @@ parallel::stopCluster(cl)
 ```{r session_info}
 sessioninfo::session_info()
 ```
-
-
