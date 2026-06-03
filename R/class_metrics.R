@@ -33,22 +33,36 @@ class_metrics <- function(ml, train, ml_title){
         dplyr::filter(.metric %in% c("sens", "spec"))
 
 
-    y <- train %>%
+    y_binary <- train %>%
         predict(ml, new_data = ., type = "prob") |>
         dplyr::mutate(Real= train$class) |>
         dplyr::mutate(Real = ifelse(Real == "presence", 1, 0))
 
-    x  <- test %>%
+    x_binary  <- test %>%
         predict(ml, new_data = ., type = "prob") |>
         dplyr::mutate(Real= test$class) |>
         dplyr::mutate(Real = ifelse(Real == "presence", 1, 0)) |>
         dplyr::select(-.pred_pseudoabs)
 
+    y_class <- train %>%
+        predict(ml, new_data = ., type = "prob") |>
+        dplyr::mutate(Real= train$class)
+
+    x_class  <- test %>%
+        predict(ml, new_data = ., type = "prob") |>
+        dplyr::mutate(Real= test$class) |>
+        dplyr::select(-.pred_pseudoabs)
+
     table |>
         dplyr::bind_rows(tibble::tibble(.metric = c("auc"),
                                         .estimator = c("binary"),
-                                        train = round(Metrics::auc(y$Real, y$.pred_presence),2),
-                                        test = round(Metrics::auc(x$Real, x$.pred_presence),2),
+                                        train = round(Metrics::auc(y_binary$Real, y_binary$.pred_presence),2),
+                                        test = round(Metrics::auc(x_binary$Real, x_binary$.pred_presence),2),
+                                        difference = round(train-test, 2)),
+                         tibble::tibble(.metric = c("BCI"),
+                                        .estimator = c("binary"),
+                                        train = round(tidysdm::boyce_cont_vec(y_class$Real, y_class$.pred_presence),2),
+                                        test = round(tidysdm::boyce_cont_vec(x_class$Real, x_class$.pred_presence),2),
                                         difference = round(train-test, 2)),
                          tibble::tibble(.metric = c("TSS"),
                                         .estimator = c("binary"),
@@ -61,5 +75,6 @@ class_metrics <- function(ml, train, ml_title){
         gt::tab_style(style = list(gt::cell_text(weight = "bold")),
                       locations = gt::cells_body(columns = c(.metric, train, test, difference),
                                                  rows = .metric %in% c("auc","TSS", "sens",
-                                                                       "accuracy", "bal_accuracy")))
+                                                                       "accuracy", "bal_accuracy", "BCI")))
+
 }
