@@ -2,13 +2,14 @@
 #'
 #' @param ml machine learning algorithm fitted.
 #' @param train train dataset preprocessed.
+#' @param test test dataset preprocessed.
 #' @param ml_title title of the machine learning algorithm.
 #'
 #' @returns A gt object containing the ranking metrics table for the train data and test data.
 #' @export
 #'
 #' @examples 1+1
-class_metrics <- function(ml, train, ml_title){
+class_metrics <- function(ml, train, test, ml_title){
     table <- dplyr::bind_cols(train %>%
                                   predict(ml, new_data = . ) |>
                                   dplyr::mutate(Real= train$class) |>
